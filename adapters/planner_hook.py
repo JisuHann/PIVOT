@@ -49,12 +49,16 @@ class RekepPlannerHook:
         # pivot 이면 반복 시각 질의로 점을 찍고, finalize 가 주입하는 progress_cost 의
         # **대상만** 목표에서 그 점으로 바뀐다 - solver 구조는 그대로다.
         self.subgoals = str(self.cfg.get("main", {}).get("subgoals", "solver")).lower()
+        # 한 곳에서 나온 시드를 VLM · pivot · 두 solver 가 나눠 쓴다. 갈래마다
+        # 따로 두면 "무엇을 바꿔서 결과가 달라졌는가" 를 다시 물을 수 없다.
+        self.seed = self.cfg.get("main", {}).get("seed", 0)
         m = dict(self.cfg.get("model", {}))
         self.client = VLMClient(
             m.get("name", "Qwen/Qwen3-VL-8B-Instruct"),
             base_url=m.get("base_url", "http://localhost:8000/v1"),
             temperature=float(m.get("temperature", 0.0)),
-            max_tokens=int(m.get("max_tokens", 900)))
+            max_tokens=int(m.get("max_tokens", 900)),
+            seed=self.seed)
         self.log = []
 
     # ---------- 내부 ----------
@@ -384,7 +388,8 @@ class RekepPlannerHook:
         main = self.cfg.get("main", {})
         ch = PIVOT.PivotChooser(self.client, self.prompts_dir,
                                 rounds=int(main.get("pivot_rounds", 3)),
-                                n_samples=int(main.get("pivot_samples", 9)))
+                                n_samples=int(main.get("pivot_samples", 9)),
+                                seed=int(self.seed or 0))
         cur = np.asarray(robot_xy, float)[:2]
         goal = np.asarray(goal_xy, float)[:2]
         kps = K.get_keypoints()

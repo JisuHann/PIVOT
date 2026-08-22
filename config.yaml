@@ -7,6 +7,10 @@ main:
   constraint_tolerance: 0.10     # backtracking 판정. ReKep 값 그대로
   max_iterations: 40             # 바깥 루프 상한
   max_backtracks: 8              # 없으면 풀 수 없는 제약이 sweep 전체를 멈춘다
+  # VLM · pivot · 두 solver 가 나눠 쓰는 하나의 시드. temperature 0 만으로는
+  # 재현되지 않는다 - vLLM 연속 배칭 탓에 같은 에피소드가 위반 98.2 / 80.0 / 10.9 %
+  # 로 갈렸다. CLI: --seed
+  seed: 0
   # v/a/J 를 VLM 에게 물을지. false 면 프롬프트에서 동역학 문단이 빠지고 어휘도
   # 막히므로, on/off 두 실행의 차이가 동역학 하나로만 남는다 (ablation).
   # CLI 로 덮어쓴다: --dynamics / --no-dynamics
@@ -42,3 +46,5 @@ model:
   base_url: http://localhost:8000/v1
   temperature: 0.0
   max_tokens: 900
+  # 시드는 main.seed 에서 온다. 여기 두지 않는 이유는 pivot 과 solver 가 같은
+  # 값을 써야 하고, 두 곳에 적으면 조용히 어긋나기 때문이다.

@@ -42,12 +42,17 @@ class VLMClient:
     """OpenAI 호환 chat/completions 엔드포인트에 이미지 한 장 + 텍스트를 보낸다."""
 
     def __init__(self, model, base_url="http://localhost:8000/v1",
-                 temperature=0.0, max_tokens=512, timeout=180):
+                 temperature=0.0, max_tokens=512, timeout=180, seed=None):
         self.model = model
         self.url = base_url.rstrip("/") + "/chat/completions"
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.timeout = timeout
+        # temperature=0 만으로는 재현되지 않는다. vLLM 은 연속 배칭이라 같은 요청도
+        # 함께 묶인 요청에 따라 수치가 갈리고, 실측으로 같은 에피소드가 위반
+        # 98.2 / 80.0 / 10.9 % 로 나왔다. seed 를 실어야 그 갈래가 닫힌다.
+        # None 이면 필드를 아예 넣지 않는다 - seed 를 모르는 엔드포인트도 있다.
+        self.seed = seed
 
     def ask(self, prompt, image=None):
         """프롬프트(+이미지)를 보내고 응답 텍스트를 돌려준다."""
@@ -61,6 +66,7 @@ class VLMClient:
             "messages": [{"role": "user", "content": content}],
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            **({} if self.seed is None else {"seed": int(self.seed)}),
         }).encode()
         req = urllib.request.Request(self.url, data=body,
                                      headers={"Content-Type": "application/json"})

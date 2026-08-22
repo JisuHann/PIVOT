@@ -46,6 +46,8 @@ def main():
                     help="동역학 어휘를 빼고 기하만 (기본)")
     ap.add_argument("--max-stages", type=int, default=None,
                     help="단계 상한 (기본 4)")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="VLM · pivot · 두 solver 가 나눠 쓰는 시드 (기본 0)")
     ap.add_argument("--maxfun", type=int, default=None,
                     help="두 solver 의 sampling_maxfun 을 한꺼번에")
     args = ap.parse_args()
@@ -55,6 +57,10 @@ def main():
         cfg.setdefault("main", {})["subgoals"] = args.subgoals
     if args.dynamics is not None:
         cfg.setdefault("main", {})["dynamics"] = bool(args.dynamics)
+    if args.seed is not None:
+        cfg.setdefault("main", {})["seed"] = args.seed
+        cfg.setdefault("subgoal_solver", {})["seed"] = args.seed
+        cfg.setdefault("path_solver", {})["seed"] = args.seed
     if args.maxfun is not None:
         cfg.setdefault("subgoal_solver", {})["sampling_maxfun"] = args.maxfun
         cfg.setdefault("path_solver", {})["sampling_maxfun"] = args.maxfun
