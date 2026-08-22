@@ -258,7 +258,8 @@ class RekepPlannerHook:
             targets = self._stop_targets(qinfo, stop_xy, n_stages)
         elif self.subgoals == "pivot":
             targets = self._pivot_targets(topview, frame, si, robot_xy, goal_xy,
-                                          robot_yaw, n_stages, infeasible_r)
+                                          robot_yaw, n_stages, infeasible_r,
+                                          program)
 
         program, qinfo = STG.finalize(program, goal_xy, robot_xy, qinfo,
                                       targets=targets)
@@ -361,7 +362,7 @@ class RekepPlannerHook:
                                for p, y in zip(xy, yaws)]}
 
     def _pivot_targets(self, topview, frame, sdf_interp, robot_xy, goal_xy,
-                       robot_yaw, n, min_clear):
+                       robot_yaw, n, min_clear, program=None):
         """중간 단계마다 반복 질의로 끝점을 하나씩 고른다.
 
         마지막 단계는 목표가 곧 끝점이라 묻지 않는다. 단계가 하나뿐이면 개입할 자리가 없다.
@@ -381,13 +382,38 @@ class RekepPlannerHook:
                                 n_samples=int(main.get("pivot_samples", 9)))
         cur = np.asarray(robot_xy, float)[:2]
         goal = np.asarray(goal_xy, float)[:2]
+        kps = K.get_keypoints()
+
+        def reject_for(stage):
+            """이 단계의 path 제약을 어기는 후보를 뺀다.
+
+            없으면 같은 응답 안에서 두 답이 어긋난다 - 모델이 "사람에게서 0.7 m" 라고
+            써 놓고 그보다 가까운 점을 골라도 막을 것이 없다. 그러면 두 제약이
+            가중치 200 으로 맞붙어 경로가 그 사이를 지난다.
+            """
+            fns = ((program or {}).get(stage, {}) or {}).get("path") or []
+            if not fns:
+                return None
+
+            def _r(pt):
+                tr = K.Traj(np.asarray([pt], float), dt=0.2)
+                for fn in fns:
+                    try:
+                        if float(fn(tr, kps)) > 0.0:
+                            return True
+                    except Exception:            # noqa: BLE001
+                        continue
+                return False
+            return _r
+
         targets = {}
         for s in range(1, n):
             remain = float(np.linalg.norm(goal - cur))
             step = max(0.6, remain / max(n - s + 1, 1))
             pt = ch.choose(annotate, topview, frame, sdf_interp, cur, goal,
                            step_m=step, min_clear=min_clear,
-                           robot_yaw=robot_yaw if s == 1 else None, tag=f"stage{s}")
+                           robot_yaw=robot_yaw if s == 1 else None,
+                           tag=f"stage{s}", reject=reject_for(s))
             if pt is None:
                 continue
             targets[s] = [float(pt[0]), float(pt[1])]

@@ -43,7 +43,7 @@ def parse_pick(text, n):
 
 
 def ring_candidates(sdf_interp, frame, center, goal, radius, n_want,
-                    min_clear, rng, spread_rad=1.1):
+                    min_clear, rng, spread_rad=1.1, reject=None):
     """center 주위 고리에서 목표 쪽으로 치우치게 뽑는다.
 
     고르게 뿌리면 절반이 뒤쪽에 떨어져 번호를 낭비한다. 목표 반대편도 조금 남긴다 -
@@ -62,6 +62,12 @@ def ring_candidates(sdf_interp, frame, center, goal, radius, n_want,
         cells = frame.world_to_cell(cand)
         d = np.asarray(sdf_interp(np.atleast_2d(cells)), float).ravel()
         cand = cand[d > float(min_clear)]
+        # 모델이 방금 쓴 제약을 후보에도 적용한다. 없으면 같은 응답 안에서 두 답이
+        # 서로 어긋난다 - 실측: "사람에게서 0.7 m" 라고 써 놓고 사람에게서 0.98 m 인
+        # 점을 골랐고(요구 실효거리 1.22 m), 두 제약이 가중치 200 으로 맞붙어
+        # 경로가 0.72 m 로 지나가 채점에서 98.2% 위반이 됐다.
+        if reject is not None and len(cand):
+            cand = cand[~np.asarray([bool(reject(c)) for c in cand], bool)]
         if len(cand) >= 3:
             break
         radius *= 1.35
@@ -89,7 +95,7 @@ class PivotChooser:
         self.log = []
 
     def choose(self, annotate_fn, image, frame, sdf_interp, cur_xy, goal_xy,
-               step_m, min_clear=0.20, robot_yaw=None, tag=""):
+               step_m, min_clear=0.20, robot_yaw=None, tag="", reject=None):
         """다음 정차 지점 하나. 실패하면 None - 호출부가 목표 쪽 기본값으로 떨어진다."""
         center = np.asarray(cur_xy, float)[:2]
         radius = float(step_m)
@@ -97,7 +103,7 @@ class PivotChooser:
 
         for r in range(self.rounds):
             cand = ring_candidates(sdf_interp, frame, center, goal_xy, radius,
-                                   self.n, min_clear, self.rng)
+                                   self.n, min_clear, self.rng, reject=reject)
             if len(cand) < 2:
                 rounds_log.append({"round": r + 1, "why": "후보 없음"})
                 break
