@@ -36,8 +36,10 @@ def main():
     ap.add_argument("--layout-ids", default="0")
     ap.add_argument("--style-ids", default="3")
     ap.add_argument("--max-retries", type=int, default=3)
-    ap.add_argument("--subgoals", choices=("solver", "pivot"), default=None,
-                    help="단계 끝점을 누가 정하는가 (기본 solver)")
+    ap.add_argument("--subgoals", choices=("solver", "stops", "pivot"),
+                    default=None,
+                    help="단계 끝점: solver(최적화) | stops(전체 뷰 1회 질의) "
+                         "| pivot(반복 질의)")
     ap.add_argument("--dynamics", dest="dynamics", action="store_true",
                     default=None, help="v/a/J 제약을 VLM 에게 묻는다")
     ap.add_argument("--no-dynamics", dest="dynamics", action="store_false",

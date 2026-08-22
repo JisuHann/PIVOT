@@ -11,9 +11,11 @@ main:
   # 막히므로, on/off 두 실행의 차이가 동역학 하나로만 남는다 (ablation).
   # CLI 로 덮어쓴다: --dynamics / --no-dynamics
   dynamics: false
-  # 단계 끝점을 누가 정하는가. solver 면 progress_cost(GOAL, tol) 로 만든
-  # 고리 위에서 최적화가 고르고, pivot 이면 반복 시각 질의로 찍은 점이
-  # 그 자리를 대신한다. CLI: --subgoals solver|pivot
+  # 단계 끝점을 누가 정하는가.
+  #   solver - progress_cost(GOAL, tol) 이 만든 고리 위에서 최적화가 고른다
+  #   stops  - 화면 전체 후보를 한 번에 보여 주고 번호로 받는다
+  #   pivot  - 로봇 주위 고리에서 목표 쪽으로 치우친 후보를 반복 질의로 좁힌다
+  # CLI: --subgoals solver|stops|pivot
   subgoals: solver
   pivot_rounds: 3
   pivot_samples: 9

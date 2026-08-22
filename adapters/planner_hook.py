@@ -28,6 +28,7 @@ from geometry import TopviewFrame                        # noqa: E402
 from vlm import VLMClient                                # noqa: E402
 
 from src import sdf as SDF                               # noqa: E402
+from src import pivot as PIVOT                            # noqa: E402
 from src import stops as STOPS                            # noqa: E402
 from src import stages as STG                            # noqa: E402
 from src.loop import RekepLoop                           # noqa: E402
@@ -221,7 +222,12 @@ class RekepPlannerHook:
             avoid, frame, robot_xy, goal_xy,
             max_n=int(self.cfg.get("main", {}).get("stop_candidates", 14)),
             inflate_cells=robot_radius_cells or None)
-        self.log.append({"stage": "stops", "n": int(len(stop_cells))})
+        # 좌표까지 남긴다. 개수만 남기면 "VLM 이 고른 번호 -> 어느 좌표" 를 사후에
+        # 검증할 수 없다 - 실제로 재현 계산과 로그가 어긋났는데 어느 쪽이 맞는지
+        # 가리지 못했다. 번호는 1 부터이고 이 목록의 순서와 같다.
+        self.log.append({"stage": "stops", "n": int(len(stop_cells)),
+                         "xy": [[round(float(a), 3), round(float(b), 3)]
+                                for a, b in np.asarray(stop_xy, float)]})
 
         img = None
         if topview is not None:
@@ -244,8 +250,15 @@ class RekepPlannerHook:
         # 구조는 그대로다. finalize 가 주입하던 progress_cost 의 **대상만** 목표에서
         # 이 점으로 바뀐다 - 끝점이 "목표 주위 고리" 에서 "찍은 한 점" 이 된다.
         targets = None
-        if self.subgoals == "pivot":
-            targets = self._stop_targets(qinfo, stop_xy)
+        # 단계 수는 **파싱된 program** 에서 센다. qinfo["stages"] 는 finalize 가
+        # 나중에 채우므로 여기서는 늘 None 이고, 그러면 n=1 로 읽혀 이 블록이
+        # 통째로 건너뛰어진다 - 실측으로 pivot 이 한 번도 돌지 않았다.
+        n_stages = max(program) if program else 1
+        if self.subgoals == "stops":
+            targets = self._stop_targets(qinfo, stop_xy, n_stages)
+        elif self.subgoals == "pivot":
+            targets = self._pivot_targets(topview, frame, si, robot_xy, goal_xy,
+                                          robot_yaw, n_stages, infeasible_r)
 
         program, qinfo = STG.finalize(program, goal_xy, robot_xy, qinfo,
                                       targets=targets)
@@ -347,7 +360,44 @@ class RekepPlannerHook:
                 "traj_world": [(np.asarray(p, dtype=float), float(y), 1.0)
                                for p, y in zip(xy, yaws)]}
 
-    def _stop_targets(self, qinfo, stop_xy):
+    def _pivot_targets(self, topview, frame, sdf_interp, robot_xy, goal_xy,
+                       robot_yaw, n, min_clear):
+        """중간 단계마다 반복 질의로 끝점을 하나씩 고른다.
+
+        마지막 단계는 목표가 곧 끝점이라 묻지 않는다. 단계가 하나뿐이면 개입할 자리가 없다.
+        한 점을 고르면 다음 질의는 그 점에서 다시 시작한다 - 걸음마다 남은 거리가 줄어야
+        하므로 반경도 함께 줄인다.
+
+        실패하면 그 단계를 건너뛴다. 여기서 예외를 내면 에피소드가 통째로 죽는다.
+        """
+        n = int(n or 1)
+        if topview is None or n < 2:
+            self.log.append({"stage": "pivot", "skipped": "단계 1개 또는 이미지 없음",
+                             "stages": n})
+            return None
+        main = self.cfg.get("main", {})
+        ch = PIVOT.PivotChooser(self.client, self.prompts_dir,
+                                rounds=int(main.get("pivot_rounds", 3)),
+                                n_samples=int(main.get("pivot_samples", 9)))
+        cur = np.asarray(robot_xy, float)[:2]
+        goal = np.asarray(goal_xy, float)[:2]
+        targets = {}
+        for s in range(1, n):
+            remain = float(np.linalg.norm(goal - cur))
+            step = max(0.6, remain / max(n - s + 1, 1))
+            pt = ch.choose(annotate, topview, frame, sdf_interp, cur, goal,
+                           step_m=step, min_clear=min_clear,
+                           robot_yaw=robot_yaw if s == 1 else None, tag=f"stage{s}")
+            if pt is None:
+                continue
+            targets[s] = [float(pt[0]), float(pt[1])]
+            cur = np.asarray(pt, float)
+        self.log.append({"stage": "pivot", "stages": n, "picked": targets,
+                         "queries": sum(len(r["rounds"]) for r in ch.log),
+                         "rounds": ch.log})
+        return targets or None
+
+    def _stop_targets(self, qinfo, stop_xy, n):
         """`stop_points = [...]` 번호를 좌표로 바꾼다.
 
         -1 은 "목표에서 끝난다" 는 뜻이라 건너뛴다 - 마지막 단계에는 이미
@@ -356,7 +406,7 @@ class RekepPlannerHook:
         "번호가 틀렸다" 가 구별되지 않는다.
         """
         pts = qinfo.get("stop_points")
-        n = int(qinfo.get("stages") or 0)
+        n = int(n or 0)
         if not pts or not len(stop_xy):
             self.log.append({"stage": "stop_targets", "why": "번호 없음",
                              "raw": pts, "n_cand": int(len(stop_xy))})

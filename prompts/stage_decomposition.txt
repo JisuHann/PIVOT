@@ -51,7 +51,7 @@ WHERE EACH PHASE ENDS
 Say it with the numbers on the circles, as one list at the end — one entry per phase,
 in order. Use `-1` for a phase that ends at the star itself.
 
-    stop_points = [7, -1]      # phase 1 ends at circle 7, phase 2 ends at the star
+    stop_points = [<circle>, -1]   # phase 1 ends at a circle, phase 2 at the star
 
 Pick the circle that is a good place to be *after* that phase is done — past the thing
 you were working around, with room to spare. It does not have to be near the star.
@@ -147,7 +147,7 @@ def stage2_subgoal_constraint1(state, keypoints):
     """End at the star."""
     return progress_cost(state, keypoints['GOAL'], 0.3)
 
-stop_points = [9, -1]
+stop_points = [<the circle you picked>, -1]
 ```
 
 {dynamics}YOUR ANSWER
