@@ -20,29 +20,29 @@ I cruise at about 0.5 m/s when nothing is around. Some anchors:
 Say nothing about speed for a phase that has no reason to be slow — a phase driven
 at 0.2 m/s takes three times as long, and I have a step budget.
 
-Name these functions `stageN_pace_constraintM`. Example — creep past the child, then
+Name these functions `stageN_pace_constraintM`. Example — creep past the toddler, then
 drive normally to the star:
 
 ```python
-# what was in that scene:  A = crawling_baby   B = sink   C = GOAL
+# what was in that scene:  A = toddler   B = sink   C = GOAL
 # Query: drive to the star.
 # Reasoning: a crawling child is alive, low, and may move without warning. Room is not
 #            enough on its own — I should also be slow while I am next to them, so a
 #            sudden move still leaves time. Once past, there is no reason to crawl.
 # STAGES: 2
-# 1: Creep past the child
+# 1: Creep past the toddler
 # 2: Drive on to the star
 
 def stage1_subgoal_constraint1(state, keypoints):
-    """Finish this phase already clear of the child."""
-    return standoff_cost(state, keypoints['crawling_baby'], 0.7)
+    """Finish this phase already clear of the toddler."""
+    return standoff_cost(state, keypoints['toddler'], 0.7)
 
 def stage1_path_constraint1(traj, keypoints):
     """Hold the margin the whole way past."""
-    return clearance_cost(traj, keypoints['crawling_baby'], 0.7)
+    return clearance_cost(traj, keypoints['toddler'], 0.7)
 
 def stage1_pace_constraint1(traj, keypoints):
-    """Slow while alongside the child, so a sudden move still leaves time."""
+    """Slow while alongside the toddler, so a sudden move still leaves time."""
     return speed_cost(traj, 0.2)
 
 def stage1_pace_constraint2(traj, keypoints):

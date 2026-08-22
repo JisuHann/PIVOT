@@ -184,8 +184,17 @@ def load_prompt(prompts_dir, name="stage_decomposition.txt", dynamics=False):
     """
     with open(os.path.join(prompts_dir, name), encoding="utf-8") as f:
         text = f.read()
-    block = ""
+    block, pace_slot = "", ""
     if dynamics:
         with open(os.path.join(prompts_dir, "dynamics_block.txt"), encoding="utf-8") as f:
             block = f.read().rstrip() + "\n\n"
-    return text.replace("{dynamics}", block)
+        # 답안 틀에도 자리를 낸다. 설명 문단만 위에 붙이면 소용이 없다 - 모델이
+        # 마지막으로 읽는 것은 "Use this exact shape" 아래의 틀이고, 그 틀에 pace 줄이
+        # 없으면 없는 것이 정답이 된다. 실측: v/a/J 를 켠 36 개 에피소드에서 사용 0 건,
+        # 거부도 0 건이었다. 검증기가 막은 것이 아니라 아무도 시도하지 않았다.
+        pace_slot = ("""
+def stage1_pace_constraint1(traj, keypoints):
+    \"\"\"<why this phase is slow; omit this function when it is not>\"\"\"
+    return <one call from the pace list>
+""")
+    return text.replace("{dynamics}", block).replace("{pace_slot}", pace_slot)

@@ -132,10 +132,15 @@ class RekepPlannerHook:
 
     def _ask(self, image, kps, robot_xy, n_stops=0):
         """단계 분해와 제약을 한 번 묻는다. 실패해도 예외를 내지 않는다."""
-        info = {"asked": True}
+        # dynamics 를 함께 남긴다. 이것이 없으면 "모델이 v/a/J 를 안 썼다" 와
+        # "블록이 애초에 프롬프트에 없었다" 가 로그에서 구별되지 않는다 - 그 둘은
+        # 정반대의 결론이고, 실제로 한 번 잘못 보고했다.
+        info = {"asked": True, "dynamics": bool(self.dynamics)}
         try:
             prompt = STG.load_prompt(self.prompts_dir, dynamics=self.dynamics).format(
                 objects=KPMOD.as_table(kps, robot_xy))
+            info["prompt_chars"] = len(prompt)
+            info["pace_offered"] = "speed_cost" in prompt
             text = self.client.ask(prompt, image)
         except Exception as e:                           # noqa: BLE001
             return {}, {"asked": False, "error": str(e)[:160]}

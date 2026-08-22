@@ -87,6 +87,11 @@ EXAMPLES
 
 Each example lists what was in that scene, then the answer for it.
 
+The examples are other kitchens. **None of their names will be in your table.** Read
+your own list and name what is actually in front of you - copying a name from an
+example is the one mistake that cannot be recovered from, because the thing you were
+supposed to avoid then has no constraint on it at all.
+
 ```python
 # what was in that scene:  A = fridge   B = dishwasher   C = GOAL
 # Query: drive to the star.
@@ -103,16 +108,16 @@ stop_points = [-1]
 ```
 
 ```python
-# what was in that scene:  A = trashbin   B = stove   C = GOAL
+# what was in that scene:  A = stepladder   B = stove   C = GOAL
 # Query: drive to the star.
-# Reasoning: the bin sits on the floor on my route. It is inert and low, so a
+# Reasoning: the ladder stands on the floor on my route. It is inert and low, so a
 #            small margin is enough. The stove is against the wall, not on my route.
 # STAGES: 1
-# 1: Pass the bin and reach the star
+# 1: Pass the ladder and reach the star
 
 def stage1_path_constraint1(traj, keypoints):
-    """Hold a small margin from the bin the whole way past."""
-    return clearance_cost(traj, keypoints['trashbin'], 0.25)
+    """Hold a small margin from the ladder the whole way past."""
+    return clearance_cost(traj, keypoints['stepladder'], 0.25)
 
 def stage1_subgoal_constraint1(state, keypoints):
     """End at the star."""
@@ -122,26 +127,26 @@ stop_points = [-1]
 ```
 
 ```python
-# what was in that scene:  A = human   B = wine   C = sink   D = GOAL
+# what was in that scene:  A = plumber   B = porcelain_bowl   C = sink   D = GOAL
 # Query: drive to the star.
 # Reasoning: the person is alive and may shift, so they get real room and their own
 #            phase — getting past them and arriving are two different things. The
-#            wine bottle is delicate but off to the side; a modest margin covers it.
+#            bowl is delicate but off to the side; a modest margin covers it.
 # STAGES: 2
 # 1: Get past the person with room to spare
 # 2: Come up to the star
 
 def stage1_subgoal_constraint1(state, keypoints):
     """Finish this phase already clear of the person."""
-    return standoff_cost(state, keypoints['human'], 0.7)
+    return standoff_cost(state, keypoints['plumber'], 0.7)
 
 def stage1_path_constraint1(traj, keypoints):
     """A person may shift; hold the margin the whole way past."""
-    return clearance_cost(traj, keypoints['human'], 0.7)
+    return clearance_cost(traj, keypoints['plumber'], 0.7)
 
 def stage2_path_constraint1(traj, keypoints):
-    """Do not clip the bottle on the way in."""
-    return clearance_cost(traj, keypoints['wine'], 0.35)
+    """Do not clip the bowl on the way in."""
+    return clearance_cost(traj, keypoints['porcelain_bowl'], 0.35)
 
 def stage2_subgoal_constraint1(state, keypoints):
     """End at the star."""
@@ -166,7 +171,7 @@ def stage1_subgoal_constraint1(state, keypoints):
 def stage1_path_constraint1(traj, keypoints):
     """<why, in one line>"""
     return <one call from the path list>
-
+{pace_slot}
 stop_points = [<circle number per phase, in order; -1 for the star>]
 ```
 
