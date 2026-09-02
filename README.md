@@ -1,16 +1,13 @@
-# ReKep-nav — 2D 주방 네비게이션을 위한 제약 최적화 계획기
+# ReKep-nav — a constraint-optimization planner for 2D kitchen navigation
 
-[ReKep](https://rekep-robot.github.io/)(관계 키포인트 제약)의 **알고리즘 구조**를
-RoboCasa 주방의 2D 네비게이션으로 옮긴 것이다. 원본은 OmniGibson + 로봇 팔 6D
-조작용이라 그대로 돌지 않는다.
+[ReKep](https://rekep-robot.github.io/) (relational keypoint constraints) ported
+from OmniGibson 6-DoF arm manipulation to 2D navigation in RoboCasa kitchens.
+The original does not run here as-is, so what was carried over is the
+**algorithmic structure**, not the code.
 
-VLM 은 **한 번의 응답**으로 셋을 말한다 — 주행을 몇 단계로 나눌지, 각 단계가 어디서
-끝날지, 그 길이 무엇을 지켜야 할지. 사이를 잇는 경로는 최적화기가 푼다.
-
-> **주의: 이것은 `--subgoals solver` 의 설명이고, 지금까지 결과를 낸 실행이 쓴 모드가
-> 아니다.** 360 에피소드 실행(`rk720`)은 `--subgoals legs` 로 돌았고, 그쪽은 구간마다
-> 다시 묻는 PIVOT 방식이다. 두 모드가 무엇이 다른지는 아래 「모드」 절에 적었다.
-> 어느 모드로 돈 결과인지 밝히지 않은 수치는 읽지 말 것.
+In the mode the paper describes, the VLM answers **once** with three things —
+how many stages the drive has, where each ends, and what the path must respect —
+and an optimizer solves the geometry between them:
 
 ```python
 # STAGES: 2
@@ -32,167 +29,218 @@ def stage2_subgoal_constraint1(state, keypoints):
 stop_points = [7, -1]
 ```
 
-`stop_points` 가 단계별 정차 지점(그림의 원 번호)이고 `-1` 은 "목표에서 끝난다" 다.
-원본이 `grasp_keypoints = [...]` 로 단계별 요약을 돌려주는 것과 같은 꼴이다.
+`stop_points` are the per-stage stopping positions (the numbered circles in the
+annotated image); `-1` means "this stage ends at the goal." It mirrors the
+original's `grasp_keypoints = [...]` summary.
 
-## 어디에 붙는가
+> **That describes `--subgoals solver`, which is not the mode any published
+> result used.** The 360-episode run (`rk720`) ran `--subgoals legs`, a per-leg
+> PIVOT loop that decides the route differently. See [Modes](#modes) for what
+> happens there. Do not read a number from this policy without knowing which
+> mode produced it.
 
-이 저장소는 계획기만 담는다. 환경·컨트롤러·평가·판정문은
-[VoxPoser fork](https://github.com/JisuHann/VoxPoser) 의 `run_tasks` 를 그대로 쓴다 —
-`external_planner` 훅 자리에 끼워지므로, 다른 정책과 **같은 잣대로 채점**된다.
+## Where it plugs in
+
+This repository holds the planner only. The environment, controller, scorer and
+verdict line all come from the [VoxPoser fork](https://github.com/JisuHann/VoxPoser)'s
+`run_tasks`, so results are scored on exactly the same terms as every other
+policy:
 
 ```
 run_tasks(..., external_planner=RekepPlannerHook(cfg))
         ^
-   여기 한 곳만 갈아끼운다
+   the single swap point
 ```
 
-훅은 에피소드당 **한 번** 불린다(`max_plan_iter: 1`). 그래서 ReKep 의
-"풀고 -> 조금 실행 -> 다시 관측" 루프를 시뮬레이터로 닫을 수 없고, 같은 루프를
-**가상 상태로 훅 안에서** 돈다 — 마지막으로 내놓은 waypoint 가 "현재 상태" 다.
+The hook is called **once per episode** (`max_plan_iter: 1`). ReKep's
+solve → execute briefly → re-observe loop therefore cannot be closed through the
+simulator, so the same loop runs **on virtual state inside the hook**: "where I
+am now" means "the last waypoint I emitted." Raising `max_plan_iter` was
+rejected deliberately — it would change the execution path every policy shares
+and break the comparison.
 
-## 구조
+## Layout
 
 ```
-run_rekep.py          진입점
-config.yaml           solver 예산 · 스위치
+run_rekep.py          entry point
+config.yaml           solver budgets and switches
 src/
-  stops.py            정차 지점 후보를 화면 전체에서 뽑아 번호를 붙인다
-  stages.py           응답 파싱 · 검증 · 끝점 주입
-  loop.py             가상 상태 반복 + backtracking
-  subgoal_solver.py   단계가 끝날 자세 (x, y, yaw)
-  path_solver.py      그 사이 제어점
-  costs.py            충돌 · 일관성 · 경로길이 · 회전 · 통과불가 · 제약 위반
-  sdf.py              occupancy -> 부호거리장
-  interp.py           정규화 · 보간 · 각도 wrap
+  stops.py            proposes stopping candidates across the view and numbers them
+  pivot.py            PIVOT: candidates on a shrinking ring, picked by number
+  legs.py             per-leg re-query — the mode rk720 used
+  costs.py            collision · consistency · path length · turning · infeasible · violation
+  sdf.py              occupancy -> signed distance field
+  interp.py           normalization · interpolation · angle wrap
 adapters/
-  planner_hook.py     external_planner 계약 구현 — 유일한 접점
-lib/                  측정 코드 (반경 패드 · 표면거리 · AST 검증기)
-prompts/              VLM 질의 템플릿
-tests_*.py            시뮬레이터 없이 도는 검증
+  planner_hook.py     implements the external_planner contract — the only contact point
+lib/                  measurement code (radius pads · surface distance · AST validator)
+prompts/              VLM query templates
+tests_*.py            checks that run without the simulator
 ```
 
-## 스위치 두 개
+## Modes
 
-둘 다 끄면 원본에 가장 가깝다. 켜면 프롬프트에 해당 문단이 붙고 어휘가 열리므로,
-**차이가 그 하나로만 남는다**.
+`--subgoals` selects one of four, and they differ in **what decides the route** —
+not in a detail. Always quote the mode alongside a result.
 
-| 스위치 | 끄면 (기본) | 켜면 |
+| Mode | Who fixes the endpoints | Segment geometry |
 |---|---|---|
-| `--dynamics` | 기하만 푼다 (원본에는 v/a/J 가 없다) | `speed_cost` · `accel_cost` · `jerk_cost` 를 단계마다 쓸 수 있다 |
+| `solver` (default) | the optimizer, from constraints as cost | optimizer |
+| `stops` | the VLM, picking a number off the whole view | optimizer |
+| `pivot` | the VLM, picking from a ring that shrinks each round | optimizer |
+| `legs` | the VLM, **re-asked at every segment** | straight line if a gate passes, else optimizer |
 
-## 모드 — `--subgoals`
+### How PIVOT selection works
 
-네 가지가 있고, **무엇이 경로를 정하는지가 근본적으로 다르다.** 결과를 인용할 때는
-반드시 모드를 함께 적는다.
+`pivot.py` follows the PIVOT paper's navigation appendix. For one segment:
 
-| 모드 | 끝점을 정하는 주체 | 구간 경로 |
+1. Sample standable candidates on a ring around the robot, biased toward the
+   goal. The first round uses a wide ring and many samples
+   (`pivot_first_r: 2.0`, `pivot_first_samples: 64`); later rounds shrink it.
+2. Drop candidates that the model's own path constraints reject — the check is
+   run on the **straight line from here to that candidate**, not on the
+   candidate point, so a spot that is fine to stand on but unreachable without
+   crossing something is removed rather than offered.
+3. Draw the survivors on the topview as numbered circles and ask the model which
+   to walk to. The reply is parsed as `{"points": [...]}` and the numbers index
+   back into the candidate array.
+4. Repeat for `pivot_rounds` (3), narrowing to a single pick.
+
+The model never sees coordinates, only numbers on a picture, so it cannot
+compute the answer without looking. Written because whole-view candidate sets
+included points heading away from the goal — one such pick turned a 4.78 m
+straight shot into a 22.6 m route.
+
+`legs` wraps this per segment and shows only the keypoints near that segment's
+corridor, because a whole-scene view invites the model to constrain objects
+irrelevant to where it is going next. In exchange it **discards the model's
+subgoal constraints** — the endpoint is whatever number was picked, and the
+model's constraints apply only to the way there (`legs.py:491`).
+
+### What the `legs` run actually did (`rk720`, 360 episodes)
+
+Worth recording, because it differs from what the top of this file promises.
+
+| | |
+|---|---|
+| Stopping points picked by the VLM | 753 (from 2,207 candidate-image queries) |
+| Segments walked as **straight lines**, no optimizer | 906 / 1,085 = **83.5%** |
+| Episodes where the optimizer **never ran** | 217 / 360 = **60.3%** |
+| Model-written subgoal constraints discarded | 1,939 |
+| Solver iterations | **1 on all 179 legs**, zero backtracks |
+
+Constraint optimization is a minority shareholder in this mode.
+`max_iterations: 40` and `max_backtracks: 8` are configured and were never
+exercised.
+
+### The straight-line gate is miscalibrated
+
+A segment goes straight if two conditions hold: the SDF clearance is sufficient,
+and no path constraint the model wrote objects to that line (`legs.py:534`). The
+second one is the problem.
+
+`clearance_cost` does not return metres. It returns a normalized shortfall:
+
+```
+value = (eff − d) / eff        eff = requested_margin + object_radius_pad
+veto when value > 0.10    ⇔    d < 0.9 × (requested_margin + radius_pad)
+```
+
+The pad comes from a hard-coded table in `constraints.py` (`crawling_baby 1.38`,
+`human 0.52`, …). So `clearance_cost(traj, crawling_baby, 0.75)` **vetoes any
+line passing within 1.92 m of the keypoint** — against a scored boundary of
+0.6 m. The model's number and the benchmark's number were never the same
+quantity.
+
+Reconstructing the 111 rejected segments geometrically:
+
+| | |
+|---|---|
+| Would have violated the scored boundary (veto justified) | 41 / 111 |
+| **Would not have violated anything scored** | **70 / 111** |
+| Vetoed only by objects the benchmark does not score | 22 |
+| Already cleared the requested margin; vetoed by the radius pad alone | 39 / 102 |
+
+Keypoints that triggered vetoes include `microwave` (6), `sink_main` (4),
+`knife`, `main_door` — and three times `STOP1` / `STOP2`, meaning the model
+wrote an avoidance constraint against the waypoint it was trying to reach.
+Meanwhile only 12 of the 906 segments let through as straight lines actually
+violated (1.3%). **The gate leaks little and over-rejects a lot** — roughly 1.7
+safe lines discarded per unsafe one caught.
+
+The fix is to compare against the tier boundary rather than against whatever
+margin the model asked for.
+
+## Other switch
+
+| Switch | Off (default) | On |
 |---|---|---|
-| `solver` (기본) | 최적화기 — 제약을 비용으로 풀어서 | 최적화기 |
-| `stops` | VLM — 전체 그림에서 번호를 골라 | 최적화기 |
-| `pivot` | VLM — 고리 위 후보를 좁혀 가며 번호를 골라 | 최적화기 |
-| `legs` | VLM — **구간마다** 다시 보고 번호를 골라 | 통과하면 직선, 아니면 최적화기 |
+| `--dynamics` | geometry only (the original has no v/a/J) | `speed_cost` · `accel_cost` · `jerk_cost` become available per stage |
 
-`legs` 는 구간마다 질의를 새로 하고, 그 구간의 keypoint 만 보여 준다. 전체 장면을
-한 번에 주면 지금 가는 길과 무관한 물체까지 제약을 걸기 때문이다. 대신 **모델이 쓴
-subgoal 제약은 버린다** — 끝점은 고른 번호가 정하고, 모델의 제약은 "가는 길"에만
-쓴다(`legs.py:491`).
+Both switches off is closest to the original. Turning one on appends its
+paragraph to the prompt and opens the matching vocabulary, so **the difference
+stays attributable to that one switch**.
 
-### `legs` 로 돈 실행에서 실제로 일어난 일 (`rk720`, 360 에피소드)
+## Differences from the original
 
-문서가 약속하는 것과 다르므로 실측을 남긴다.
+All of them are recorded in `DESIGN.md`. In brief:
 
-| | 값 |
-|---|---|
-| VLM 이 번호로 고른 정차점 | 753 (후보 이미지 질의 2,207 회) |
-| 최적화기 없이 **직선**으로 처리된 구간 | 906 / 1,085 = **83.5%** |
-| 최적화기가 **한 번도 안 돈** 에피소드 | 217 / 360 = **60.3%** |
-| 폐기된 모델 subgoal 제약 | 1,939 |
-| solver 반복 횟수 | 179 구간 **전부 1회**, backtrack 0 |
+- **Path length is divided by the straight-line distance.** ReKep's weight of
+  4.0 assumes a 0.55 m workspace; in a 6 m kitchen it overwhelms the collision
+  term, and driving straight through a wall becomes the cheaper option.
+- **An "infeasible" cost is added.** Keypoints are object centres, so the points
+  for `sink` and `stove` sit inside the counter. An arm can reach over an
+  object; a wheeled base cannot be there. This plays the role of ReKep's IK
+  unreachability.
+- **Heading change is penalized.** A holonomic base separates yaw from direction
+  of travel, so a turning cost does not catch spatial zigzag.
+- **The DINOv2 proposal stage is not used.** That stage does not *find* objects;
+  it splits an already-known mask into parts, which a navigation policy has no
+  use for — the simulator already provides the object list and positions.
+  Stopping candidates are drawn from traversable cells instead and picked by
+  number.
 
-즉 이 모드에서 ReKep 의 제약 최적화는 소수 지분이다. `max_iterations: 40`,
-`max_backtracks: 8` 은 설정만 되어 있고 한 번도 쓰이지 않았다.
+  This README previously justified the omission with "185 candidates, only 5%
+  worth avoiding, 56% on counters and cabinets." **That measurement cannot be
+  located** — no run directory, script or log producing it exists in this
+  repository, and `DESIGN.md` does not contain it despite a commit message
+  saying it does. Treat the figure as unverified; the structural argument above
+  stands on its own.
 
-### 직선 게이트의 보정이 어긋나 있다
+Every other weight keeps its original value. Changing them would make "the
+structure was ported and the result differs" indistinguishable from "the weights
+were tuned and the result differs."
 
-구간을 직선으로 갈지 말지는 두 조건으로 정한다 — SDF 여유가 충분한가, 그리고 모델이
-쓴 path 제약이 그 직선을 거부하는가(`legs.py:534`). 후자가 문제다.
+## Running it
 
-`clearance_cost` 는 미터가 아니라 정규화 값을 돌려준다:
-
-```
-값 = (eff - d) / eff,   eff = 모델이 요구한 margin + 물체 반경 패드
-tol 0.10  ->  d < 0.9 x (margin + 반경) 이면 거부
-```
-
-반경 패드는 `constraints.py` 의 표(`crawling_baby 1.38`, `human 0.52`, …)에서 온다.
-그래서 `clearance_cost(traj, crawling_baby, 0.75)` 는 **중심거리 1.92 m 안쪽을 전부
-거부한다** — 채점 경계는 0.6 m 인데도.
-
-거부된 111 구간의 직선을 기하로 다시 재 보면:
-
-| | 값 |
-|---|---|
-| 실제로 채점 경계를 침범했을 것 (거부가 옳았다) | 41 / 111 |
-| **침범하지 않았을 것** | **70 / 111** |
-| 채점 대상이 아닌 물체 때문에만 거부 | 22 |
-| 요구 margin 은 이미 만족했는데 반경 패드로만 거부 | 39 / 102 |
-
-거부를 유발한 대상에 `microwave`(6), `sink_main`(4), `knife`, `main_door` 가 있고,
-**모델이 자기가 가려는 정차점(`STOP1`·`STOP2`)에 회피 제약을 건 경우도 3 회** 있다.
-반대로 직선으로 통과시킨 906 구간 중 실제 위반은 12 건(1.3%)뿐이다 — **놓치는 쪽은
-적고 과잉 거부가 많다.** 안전한 직선 1.7 개를 버려야 위험한 직선 1 개를 잡는 비율이다.
-
-고치려면 임계를 모델이 부른 값이 아니라 **티어 경계**와 비교해야 한다.
-
-## 원본과 다른 점
-
-옮기면서 생긴 차이는 `DESIGN.md` 에 전부 적었다. 요약하면:
-
-- **경로길이 항을 직선거리로 나눈다.** ReKep 의 4.0 은 0.55 m 작업공간 기준이라
-  6 m 주방에서는 충돌 항을 압도한다 — 벽을 뚫고 직선으로 가는 쪽이 비용상 이득이 됐다.
-- **"통과불가" 비용을 더한다.** 키포인트가 물체 중심이라 `sink`·`stove` 의 점은 조리대
-  안쪽이다. 팔은 물체 위로 뻗을 수 있지만 바퀴 베이스는 그 자리에 있을 수 없다 —
-  ReKep 의 IK 도달불가가 하던 역할이다.
-- **진행 방향 변화를 벌한다.** 홀로노믹 베이스는 yaw 와 진행 방향이 분리돼 있어
-  회전 비용으로는 공간적 지그재그가 잡히지 않는다.
-- **DINOv2 제안 단계를 쓰지 않는다.** 원본의 그 단계는 물체를 찾는 것이 아니라 이미
-  알려진 마스크를 부위로 쪼개는 것인데, 주방에 돌리면 후보 185 개 중 실제로 피해야 할
-  대상은 5% 뿐이다 (조리대·수납장에 56%). 대신 통행 가능한 칸에서 정차 지점 후보를
-  뽑아 번호로 고르게 한다.
-
-가중치는 그 밖에 원본 값을 그대로 쓴다. 바꾸면 "구조를 옮겼는데 결과가 다르다" 와
-"가중치를 손봤더니 결과가 다르다" 를 가를 수 없다.
-
-## 돌리는 법
-
-VoxPoser fork 와 RoboCasa 벤치마크가 있는 트리 안에서, `policy/ReKep/` 자리에 두고:
+Place this at `policy/ReKep/` inside a tree that has the VoxPoser fork and the
+RoboCasa benchmark:
 
 ```bash
-# 기본값(solver) — 제약을 비용으로 풀어서 끝점까지 최적화기가 정한다
+# default (solver) — the optimizer fixes the endpoints from constraints as cost
 python3 run_rekep.py -m 'Qwen/Qwen3-VL-8B-Instruct' -p 8003 \
     -o outputs/run1 --layout-ids 0 --style-ids 3 \
     NavigateKitchenCatBlockingRouteA
 
-# rk720 이 실제로 쓴 조합 — 구간마다 다시 묻고, 통과하면 직선으로 간다
+# what rk720 actually ran — re-ask per segment, walk straight when the gate passes
 python3 run_rekep.py -m 'Qwen/Qwen3-VL-8B-Instruct' -p 8003 \
     -o outputs/run2 --subgoals legs --straight-first \
     --layout-ids 0 --style-ids 3 \
     NavigateKitchenCatBlockingRouteA
 ```
 
-실행 설정은 출력 디렉터리의 `rekep_config.json` 에 저장된다. 결과를 다시 볼 때는
-그 파일부터 확인한다 — 명령줄은 어디에도 남지 않으므로, 어느 모드로 돈 실행인지
-알 수 있는 유일한 기록이다.
+The run's settings are saved to `rekep_config.json` in the output directory.
+Check that file first when revisiting results — the command line is not recorded
+anywhere else, so it is the only evidence of which mode produced them.
 
-시뮬레이터 없이 도는 검증만 보려면:
+For the checks that need no simulator:
 
 ```bash
-python3 tests_r1.py       # SDF 부호 · 좌표 왕복 · 비용 항 단위
-python3 tests_r2.py       # 두 solver
-python3 tests_r3.py       # 루프 · backtracking
-python3 tests_dyn.py      # 동역학 스위치
-python3 tests_partial.py  # 함수 하나가 틀려도 나머지를 살리는가
+python3 tests_r1.py       # SDF sign · coordinate round-trip · cost terms
+python3 tests_r2.py       # both solvers
+python3 tests_r3.py       # loop · backtracking
+python3 tests_dyn.py      # the dynamics switch
+python3 tests_partial.py  # does one bad function still leave the rest usable
 ```
 
-시험은 저장된 덤프를 쓴다. 다른 기계에서는 `REKEP_FIXTURES` 로 위치를 알려 준다.
+The tests read stored dumps; point `REKEP_FIXTURES` at them on another machine.
