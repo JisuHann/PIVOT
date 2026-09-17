@@ -4,7 +4,7 @@ VLM 은 **무엇을, 얼마나** 만 정한다. 단위 변환·정규화·미분
 소유한다. VLM 이 np.linalg.norm 을 직접 쓰기 시작하면 항마다 단위가 달라져
 서로 더할 수 없게 되고, 무엇이 위반인지도 코드마다 달라진다.
 
-부호 규약은 ReKep 과 같다: **반환 <= 0 이면 만족, > 0 이면 위반량**.
+부호 규약은 PIVOT 과 같다: **반환 <= 0 이면 만족, > 0 이면 위반량**.
 그래서 제약을 그냥 더할 수 있다.
 
 정규화: 모든 반환값은 기준값 대비 무차원이다. clearance 는 margin 대비,
@@ -173,7 +173,7 @@ class UnknownKeypoint(KeyError):
 def _kp_xy(kp):
     """라벨('A') 도 좌표((x, y)) 도 받는다.
 
-    ReKep 의 관용구가 keypoints[i] 라서 VLM 이 좌표를 직접 넘기는 쪽을 더
+    PIVOT 의 관용구가 keypoints[i] 라서 VLM 이 좌표를 직접 넘기는 쪽을 더
     자연스럽게 쓴다 (실제 응답에서 확인). 둘 다 받아야 멀쩡한 제약이 형식
     때문에 버려지지 않는다.
     """
@@ -192,7 +192,7 @@ def _kp_xy(kp):
 def _label_of(kp):
     """좌표로 넘어온 키포인트를 등록된 라벨로 되돌린다.
 
-    ReKep 관용구가 keypoints['G'] 라서 VLM 은 좌표를 직접 넘기는 쪽을 자주 쓴다.
+    PIVOT 관용구가 keypoints['G'] 라서 VLM 은 좌표를 직접 넘기는 쪽을 자주 쓴다.
     그런데 점군과 반경 보정은 라벨로 조회하므로, 좌표로 들어오면 둘 다 조용히
     빠진 채 중심거리만 남는다 - 실측: 같은 제약이 'A' 로는 +0.057(위반),
     keypoints['A'] 로는 -1.427(만족) 이 나왔다. 표기 때문에 판정이 뒤집히면 안 된다.
@@ -308,7 +308,7 @@ def jerk_limit_cost(traj, j_max):
 def standoff_cost(state, kp, min_d):
     """이 자세 하나가 kp 에서 min_d(m) 이상 떨어져 있는가.
 
-    clearance_cost 를 한 점으로 줄인 것이다. ReKep 방식 solver 의 subgoal 제약은
+    clearance_cost 를 한 점으로 줄인 것이다. PIVOT 방식 solver 의 subgoal 제약은
     궤적이 아니라 자세 하나를 받으므로 traj 판이 쓰이지 않는다.
     """
     min_d = float(min_d)
@@ -374,27 +374,27 @@ PLAN_ONLY = {
     "standoff_cost": standoff_cost,
 }
 
-# ReKep 방식 solver 가 VLM 에게 노출하는 것. subgoal 은 자세 하나, path 는 궤적을 받는다.
+# PIVOT 방식 solver 가 VLM 에게 노출하는 것. subgoal 은 자세 하나, path 는 궤적을 받는다.
 # pace_cost 는 넣지 않는다 - solver 의 제어점은 시간이 아니라 거리 간격이라
 # Traj.v/a/j 가 무의미해진다. 속도는 _pace_profile 로 따로 강제한다.
-REKEP_SUBGOAL = {
+PIVOT_SUBGOAL = {
     "progress_cost": progress_cost,
     "heading_cost": heading_cost,
     "standoff_cost": standoff_cost,
 }
-REKEP_PATH = {
+PIVOT_PATH = {
     "clearance_cost": clearance_cost,
 }
 
-# ---------- ReKep 단계용 동역학 제약 ----------
+# ---------- PIVOT 단계용 동역학 제약 ----------
 #
-# 기존 함수를 ReKep 의 단계 구조에 맞게 변형한 것이다. 달라진 것은 **speed 하나**다:
+# 기존 함수를 PIVOT 의 단계 구조에 맞게 변형한 것이다. 달라진 것은 **speed 하나**다:
 #
 #   keypoint_nav:  speed_limit_cost(traj, kp, v_max, radius)
 #   여기:          speed_cost(traj, v_max)
 #
 # keypoint_nav 에는 구간 개념이 없어 "어디서부터 어디까지 느리게" 를 표현하려면
-# 대상과 반경을 함께 줘야 했다. ReKep 은 주행을 이미 단계로 나누므로 **단계가 곧
+# 대상과 반경을 함께 줘야 했다. PIVOT 은 주행을 이미 단계로 나누므로 **단계가 곧
 # 구간**이고, 그 두 인자가 사라진다. accel·jerk 는 원래도 구간 전체에 걸리는 값이라
 # 이름만 맞춘다.
 #
@@ -417,7 +417,7 @@ def speed_cost(traj, v_max):
     return traj._out(np.max((v - v_max) / v_max, axis=1))
 
 
-REKEP_PACE = {
+PIVOT_PACE = {
     "speed_cost": speed_cost,
     "accel_cost": accel_limit_cost,
     "jerk_cost": jerk_limit_cost,
@@ -538,7 +538,7 @@ def pace_profile(specs, n=101):
 def arrive_cost(traj, scale):
     """구간 끝에 도착할 때의 속도가 평상시의 scale 배 이하인가.
 
-    ReKep 의 sub-goal 제약에 해당한다 - 구간 내내가 아니라 끝에서만 만족하면
+    PIVOT 의 sub-goal 제약에 해당한다 - 구간 내내가 아니라 끝에서만 만족하면
     된다. 이것이 다음 구간의 시작 조건이 되므로, 구간별 배수가 하나의 연속된
     속도 스케줄로 이어진다. "아기 옆에서는 멈춰 있어라" 는 scale=0 에 가깝다.
     """
@@ -551,7 +551,7 @@ DYNAMICS_ONLY["pace_cost"] = pace_cost
 DYNAMICS_ONLY["arrive_cost"] = arrive_cost
 ALLOWED["pace_cost"] = pace_cost
 # margins_used 가 인자를 뽑으려면 ALLOWED 에 있어야 한다.
-ALLOWED.update(REKEP_PACE)
+ALLOWED.update(PIVOT_PACE)
 ALLOWED["arrive_cost"] = arrive_cost
 
 # 기계의 한계. 장면과 무관한 로봇의 성질이라 VLM 에게 묻지 않는다.

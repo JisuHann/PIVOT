@@ -1,4 +1,4 @@
-"""시작에서 subgoal 까지의 경로를 푼다. ReKep 의 path_solver.py 를 2D 로.
+"""시작에서 subgoal 까지의 경로를 푼다. PIVOT 의 path_solver.py 를 2D 로.
 
 결정 변수는 중간 제어점들 (x, y, yaw). 시작과 끝은 고정이다.
 제어점 개수는 거리에 따라 3~6 개(시작·끝 포함), 즉 중간 1~4 개.
@@ -37,7 +37,7 @@ class PathSolver:
             float(self.cfg.get("opt_pos_step_size", 0.60)),
             float(self.cfg.get("opt_rot_step_size", 0.78)))
         n_mid = max(n_ctrl - 2, 0)
-        # 충돌·제약을 검사할 조밀도. ReKep 의 opt_interpolate_pos_step_size 와 같은 뜻.
+        # 충돌·제약을 검사할 조밀도. PIVOT 의 opt_interpolate_pos_step_size 와 같은 뜻.
         span = float(np.linalg.norm(end[:2] - start[:2]))
         n_dense = int(np.clip(
             round(span / max(float(self.cfg.get("opt_interpolate_pos_step_size", 0.10)), 1e-6)),
@@ -69,7 +69,7 @@ class PathSolver:
             res = dual_annealing(
                 objective, bounds=nb, x0=z0,
                 maxfun=int(self.cfg.get("sampling_maxfun", 1500)),
-                # ReKep 은 path solver 만 no_local_search=True 를 쓴다. 제어점이 많아
+                # PIVOT 은 path solver 만 no_local_search=True 를 쓴다. 제어점이 많아
                 # 국소 탐색이 비싸고, 전역 표본이 이미 충분하기 때문이다.
                 no_local_search=True,
                 minimizer_kwargs={"method": "SLSQP",

@@ -1,13 +1,13 @@
 """VLM 에게 단계 분해와 제약을 받아 프로그램으로 만든다.
 
-ReKep 은 과제 문장에서 단계를 뽑는다 ("잡는다" -> 1, "넣는다" -> 2). 네비게이션에는 그런
+PIVOT 은 과제 문장에서 단계를 뽑는다 ("잡는다" -> 1, "넣는다" -> 2). 네비게이션에는 그런
 자연스러운 분해가 없지만 **"무엇을 지나가는가" 가 곧 단계**다. 그래서 VLM 이 정하게 하되
 1~4 로 제한한다 - 더 잘게 나누면 단계당 이동이 짧아 최적화 여지가 없고, solver 호출만 는다.
 
 자동 주입이 두 곳 있다. 편법이 아니라 이 구조에서 필요한 최소한이다:
     - 마지막 단계에 progress_cost(GOAL). 없으면 아무것도 로봇을 목표로 당기지 않는다 -
       일관성 1.0 과 경로길이 4.0 만 남아 subgoal 이 현재 자리에 주저앉는다.
-      ReKep 에서는 과제 문장("컵을 홀더에 넣어라")이 그 역할을 한다.
+      PIVOT 에서는 과제 문장("컵을 홀더에 넣어라")이 그 역할을 한다.
     - 중간 단계에 subgoal 제약이 하나도 없으면 약한 progress_cost.
 
 **주입은 전부 로그에 남긴다.** 사후에 "VLM 이 쓴 것" 과 "우리가 채운 것" 을 가르지 못하면,
@@ -53,7 +53,7 @@ def parse(code, allowed_kps, dynamics=False):
     서로 다른 기준으로 걸러지고, 그러면 "무엇이 거절됐는가" 를 비교할 수 없다.
     """
     info = {"declared": None, "names": {}, "rejected": None, "compiled": []}
-    # ReKep 원본이 `grasp_keypoints = [...]` 로 단계별 요약을 돌려주는 것과 같은 꼴이다.
+    # PIVOT 원본이 `grasp_keypoints = [...]` 로 단계별 요약을 돌려주는 것과 같은 꼴이다.
     # 우리 AST 검증기는 함수 정의 외의 문장을 거절하므로, 값을 먼저 뽑고 그 줄을
     # 코드에서 지운 뒤 검증에 넘긴다.
     info["stop_points"] = STOPS.parse_stops(code)
@@ -64,12 +64,12 @@ def parse(code, allowed_kps, dynamics=False):
     for mm in _NAME_RE.finditer(code or ""):
         info["names"][int(mm.group(1))] = mm.group(2).strip()
 
-    allowed_fns = dict(K.REKEP_SUBGOAL)
-    allowed_fns.update(K.REKEP_PATH)
+    allowed_fns = dict(K.PIVOT_SUBGOAL)
+    allowed_fns.update(K.PIVOT_PATH)
     # 동역학 어휘는 켰을 때만 알려준다. 끄면 프롬프트에도 안 나가고 여기서도
     # 거절되므로, 두 설정의 차이가 v/a/J 하나로 깨끗하게 남는다.
     if dynamics:
-        allowed_fns.update(K.REKEP_PACE)
+        allowed_fns.update(K.PIVOT_PACE)
     try:
         fns = CC.compile_fns(code, allowed_kps, allowed_fns=allowed_fns)
     except CC.CodeRejected as e:
@@ -87,7 +87,7 @@ def parse(code, allowed_kps, dynamics=False):
         if not fns:
             return {}, info
 
-    # VLM 이 **무엇에 주목했는가**. 원본 ReKep 은 DINOv2 로 후보 키포인트를 제안하고
+    # VLM 이 **무엇에 주목했는가**. 원본 PIVOT 은 DINOv2 로 후보 키포인트를 제안하고
     # VLM 은 그중에서 고르지만, 우리는 환경의 물체 목록을 그대로 준다. 그러면 "주목
     # 대상" 은 목록이 정하고 VLM 은 그중 일부만 실제로 제약에 쓴다 - 무엇을 쓰고
     # 무엇을 지나쳤는지는 이 기록이 없으면 알 수 없다.

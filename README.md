@@ -1,6 +1,6 @@
-# ReKep-nav — a constraint-optimization planner for 2D kitchen navigation
+# PIVOT-nav — a constraint-optimization planner for 2D kitchen navigation
 
-[ReKep](https://rekep-robot.github.io/) (relational keypoint constraints) ported
+[PIVOT](https://rekep-robot.github.io/) (relational keypoint constraints) ported
 from OmniGibson 6-DoF arm manipulation to 2D navigation in RoboCasa kitchens.
 The original does not run here as-is, so what was carried over is the
 **algorithmic structure**, not the code.
@@ -47,12 +47,12 @@ verdict line all come from the [VoxPoser fork](https://github.com/JisuHann/VoxPo
 policy:
 
 ```
-run_tasks(..., external_planner=RekepPlannerHook(cfg))
+run_tasks(..., external_planner=PivotPlannerHook(cfg))
         ^
    the single swap point
 ```
 
-The hook is called **once per episode** (`max_plan_iter: 1`). ReKep's
+The hook is called **once per episode** (`max_plan_iter: 1`). PIVOT's
 solve → execute briefly → re-observe loop therefore cannot be closed through the
 simulator, so the same loop runs **on virtual state inside the hook**: "where I
 am now" means "the last waypoint I emitted." Raising `max_plan_iter` was
@@ -62,7 +62,7 @@ and break the comparison.
 ## Layout
 
 ```
-run_rekep.py          entry point
+run_pivot.py          entry point
 config.yaml           solver budgets and switches
 src/
   stops.py            proposes stopping candidates across the view and numbers them
@@ -185,12 +185,12 @@ stays attributable to that one switch**.
 
 All of them are recorded in `DESIGN.md`. In brief:
 
-- **Path length is divided by the straight-line distance.** ReKep's weight of
+- **Path length is divided by the straight-line distance.** PIVOT's weight of
   4.0 assumes a 0.55 m workspace; in a 6 m kitchen it overwhelms the collision
   term, and driving straight through a wall becomes the cheaper option.
 - **An "infeasible" cost is added.** Keypoints are object centres, so the points
   for `sink` and `stove` sit inside the counter. An arm can reach over an
-  object; a wheeled base cannot be there. This plays the role of ReKep's IK
+  object; a wheeled base cannot be there. This plays the role of PIVOT's IK
   unreachability.
 - **Heading change is penalized.** A holonomic base separates yaw from direction
   of travel, so a turning cost does not catch spatial zigzag.
@@ -213,23 +213,23 @@ were tuned and the result differs."
 
 ## Running it
 
-Place this at `policy/ReKep/` inside a tree that has the VoxPoser fork and the
+Place this at `policy/PIVOT/` inside a tree that has the VoxPoser fork and the
 RoboCasa benchmark:
 
 ```bash
 # default (solver) — the optimizer fixes the endpoints from constraints as cost
-python3 run_rekep.py -m 'Qwen/Qwen3-VL-8B-Instruct' -p 8003 \
+python3 run_pivot.py -m 'Qwen/Qwen3-VL-8B-Instruct' -p 8003 \
     -o outputs/run1 --layout-ids 0 --style-ids 3 \
     NavigateKitchenCatBlockingRouteA
 
 # what rk720 actually ran — re-ask per segment, walk straight when the gate passes
-python3 run_rekep.py -m 'Qwen/Qwen3-VL-8B-Instruct' -p 8003 \
+python3 run_pivot.py -m 'Qwen/Qwen3-VL-8B-Instruct' -p 8003 \
     -o outputs/run2 --subgoals legs --straight-first \
     --layout-ids 0 --style-ids 3 \
     NavigateKitchenCatBlockingRouteA
 ```
 
-The run's settings are saved to `rekep_config.json` in the output directory.
+The run's settings are saved to `pivot_config.json` in the output directory.
 Check that file first when revisiting results — the command line is not recorded
 anywhere else, so it is the only evidence of which mode produced them.
 
@@ -243,4 +243,4 @@ python3 tests_dyn.py      # the dynamics switch
 python3 tests_partial.py  # does one bad function still leave the rest usable
 ```
 
-The tests read stored dumps; point `REKEP_FIXTURES` at them on another machine.
+The tests read stored dumps; point `PIVOT_FIXTURES` at them on another machine.

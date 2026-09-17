@@ -1,4 +1,4 @@
-"""`external_planner` 훅. ReKep 방식 계획을 VoxPoser 실행 경로에 끼운다.
+"""`external_planner` 훅. PIVOT 방식 계획을 VoxPoser 실행 경로에 끼운다.
 
 `keypoint_nav` 훅과 같은 자리에 같은 계약으로 붙는다 - 환경 생성·에피소드 루프·컨트롤러·
 평가·판정문은 VoxPoser 의 `run_tasks` 를 그대로 공유한다. 세 정책이 같은 잣대로 채점되어야
@@ -31,11 +31,11 @@ from src import sdf as SDF                               # noqa: E402
 from src import pivot as PIVOT                            # noqa: E402
 from src import stops as STOPS                            # noqa: E402
 from src import stages as STG                            # noqa: E402
-from src.loop import RekepLoop                           # noqa: E402
+from src.loop import PivotLoop                           # noqa: E402
 from src.path_solver import PathSolver                   # noqa: E402
 
 
-class RekepPlannerHook:
+class PivotPlannerHook:
     """VoxPoser 의 `run_tasks(external_planner=...)` 로 넘길 호출 가능 객체."""
 
     def __init__(self, cfg, prompts_dir=None, out_root=None):
@@ -246,7 +246,7 @@ class RekepPlannerHook:
                                   radius_px=7, label_pt=12, keypoints=kps)
                 if out_dir:
                     os.makedirs(out_dir, exist_ok=True)
-                    img.save(os.path.join(out_dir, "rekep_query.png"))
+                    img.save(os.path.join(out_dir, "pivot_query.png"))
             except Exception as e:                       # noqa: BLE001
                 self.log.append({"stage": "annotate_error", "msg": str(e)[:120]})
         # 이미지 없이 물었는지를 반드시 남긴다. 조용히 None 이 되면 "VLM 이 장면을 보고
@@ -282,7 +282,7 @@ class RekepPlannerHook:
                    keypoints=K.get_keypoints(),
                    make_traj=lambda xy: K.Traj(np.asarray(xy, dtype=float), dt=0.2))
         bxy = ((float(ws_min[0]), float(ws_max[0])), (float(ws_min[1]), float(ws_max[1])))
-        loop = RekepLoop(self.cfg, bxy)
+        loop = PivotLoop(self.cfg, bxy)
         try:
             poses, info = loop.run(np.array([robot_xy[0], robot_xy[1], robot_yaw]),
                                    program, ctx)
@@ -290,7 +290,7 @@ class RekepPlannerHook:
             self.log.append({"stage": "solve_error", "msg": str(e)[:200]})
             self._dump(out_dir, goal_xy, robot_xy)
             return {"path": np.empty((0, 2), dtype=int),
-                    "planner_info": {"source": "rekep", "failure": "solve_error"},
+                    "planner_info": {"source": "pivot", "failure": "solve_error"},
                     "traj_world": []}
 
         self.log.append({"stage": "loop", **info})
@@ -364,7 +364,7 @@ class RekepPlannerHook:
 
         path_cells = np.round(frame.world_to_cell(xy)).astype(int)
         return {"path": path_cells,
-                "planner_info": {"source": "rekep", "stages": info.get("stages"),
+                "planner_info": {"source": "pivot", "stages": info.get("stages"),
                                  "backtracks": len(info.get("backtracks", [])),
                                  "stop": info.get("stop")},
                 "traj_world": [(np.asarray(p, dtype=float), float(y), 1.0)
@@ -569,7 +569,7 @@ class RekepPlannerHook:
             if xy is not None:
                 doc["waypoints"] = [[float(a), float(b), float(c)]
                                     for (a, b), c in zip(xy, yaws)]
-            with open(os.path.join(out_dir, "rekep_log.json"), "w") as f:
+            with open(os.path.join(out_dir, "pivot_log.json"), "w") as f:
                 json.dump(doc, f, ensure_ascii=False, default=str)
         except OSError:
             pass

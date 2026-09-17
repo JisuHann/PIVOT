@@ -1,6 +1,6 @@
-"""다음 지점을 푼다. ReKep 의 subgoal_solver.py 를 2D 로 옮긴 것.
+"""다음 지점을 푼다. PIVOT 의 subgoal_solver.py 를 2D 로 옮긴 것.
 
-결정 변수는 (x, y, yaw) 3D. ReKep 의 6D 에서 z 와 roll/pitch 를 뺐다 - 바닥을 굴러가는
+결정 변수는 (x, y, yaw) 3D. PIVOT 의 6D 에서 z 와 roll/pitch 를 뺐다 - 바닥을 굴러가는
 로봇에게는 자유도가 없다.
 
 yaw 를 뺄까 고민했지만 넣었다: 컨트롤러가 (xy, yaw, speed) 를 소비하고 yaw 가 SR 판정의
@@ -34,7 +34,7 @@ class SubgoalSolver:
         def objective(z):
             return costs.subgoal_cost(I.unnormalize_vars(z, self.bounds), ctx)
 
-        # 초기값: 첫 solve 는 현재 자세, 이후는 직전 해. ReKep 과 같다.
+        # 초기값: 첫 solve 는 현재 자세, 이후는 직전 해. PIVOT 과 같다.
         if from_scratch or self.last_result is None:
             x0 = np.asarray(cur_pose, dtype=float)
         else:

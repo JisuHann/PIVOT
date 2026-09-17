@@ -36,7 +36,7 @@ npz = np.load(os.path.join(EP, "voxposer_dump.npz"), allow_pickle=True)
 it = npz["iters"][0]
 avoid = np.asarray(it["avoidance_map"], float)
 fr = TopviewFrame.from_dump(npz)
-log = json.load(open(os.path.join(EP, "rekep_log.json")))
+log = json.load(open(os.path.join(EP, "pivot_log.json")))
 start = np.asarray(log["robot_xy"], float)
 goal = np.asarray(log["goal_xy"], float)
 kp_entry = next(e for e in log["log"] if e.get("stage") == "keypoints")

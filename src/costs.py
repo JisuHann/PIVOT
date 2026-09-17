@@ -1,6 +1,6 @@
-"""비용 항. ReKep 의 objective 를 2D 네비게이션으로 옮긴 것.
+"""비용 항. PIVOT 의 objective 를 2D 네비게이션으로 옮긴 것.
 
-가중치는 ReKep 값을 그대로 쓴다 - 그 값이 옳아서가 아니라, 바꾸면 "구조를 옮겼는데
+가중치는 PIVOT 값을 그대로 쓴다 - 그 값이 옳아서가 아니라, 바꾸면 "구조를 옮겼는데
 결과가 다르다" 와 "가중치를 손봤더니 결과가 다르다" 를 구분할 수 없기 때문이다.
 
 옮기지 않은 것:
@@ -15,7 +15,7 @@ import numpy as np
 from . import interp as I
 from . import sdf as S
 
-# ReKep 원본 가중치
+# PIVOT 원본 가중치
 W_COLLISION_SUBGOAL = 0.8
 W_COLLISION_PATH = 0.5
 W_CONSISTENCY = 1.0
@@ -23,12 +23,12 @@ W_TURN = 20.0
 W_PATH_LENGTH = 4.0
 W_CONSTRAINT = 200.0
 
-# 충돌 여유. ReKep 이 subgoal 0.10 / path 0.20 을 쓴다.
+# 충돌 여유. PIVOT 이 subgoal 0.10 / path 0.20 을 쓴다.
 MARGIN_SUBGOAL = 0.10
 MARGIN_PATH = 0.20
 
 # 베이스가 점유 셀 안에 있는 것은 비싼 것이 아니라 **불가능**하다.
-# ReKep 에서 IK 비용(20.0)이 하던 역할 - "물리적으로 취할 수 없는 자세를 배제한다" -
+# PIVOT 에서 IK 비용(20.0)이 하던 역할 - "물리적으로 취할 수 없는 자세를 배제한다" -
 # 의 네비게이션 대응이다. 조작에서는 팔이 물체 중심 **위로** 뻗을 수 있어 중심을
 # 목표로 삼는 것이 말이 되지만, 바퀴 베이스는 그 자리에 있을 수 없다.
 #
@@ -38,7 +38,7 @@ MARGIN_PATH = 0.20
 # 실측: 15 건 중 8 건에서 계획 경로가 장애물을 관통했고 최대 0.90 m 깊이였다.
 W_INFEASIBLE = 5000.0
 
-# 진행 방향이 얼마나 자주 꺾이는가. ReKep 에는 대응이 없다 - 팔 경로는 짧아
+# 진행 방향이 얼마나 자주 꺾이는가. PIVOT 에는 대응이 없다 - 팔 경로는 짧아
 # 경로길이 항(4.0)만으로 충분히 곧게 펴진다.
 #
 # 우리는 두 가지가 겹쳐 그것이 성립하지 않는다. (1) 경로길이를 직선거리로 나눠
@@ -69,7 +69,7 @@ def infeasibility(interp, cells, radius_m=0.0):
 
 
 def constraint_violation(fns, arg, keypoints):
-    """제약 위반의 합. ReKep 과 같이 clip(v, 0, inf) 후 더한다.
+    """제약 위반의 합. PIVOT 과 같이 clip(v, 0, inf) 후 더한다.
 
     음수(여유 있음)를 그대로 더하면 한 제약의 여유가 다른 제약의 위반을 상쇄한다.
     예외를 내는 제약은 건너뛴다 - 하나 때문에 최적화 전체가 죽으면 안 된다.
@@ -103,7 +103,7 @@ def subgoal_cost(pose, ctx, return_detail=False):
 
     v_sub, det_sub = constraint_violation(ctx.get("subgoal_fns"), tuple(pose), ctx["keypoints"])
     d["subgoal_constraint"] = W_CONSTRAINT * v_sub
-    # ReKep 은 subgoal 을 풀 때도 path 제약을 함께 본다 - 그 지점이 path 제약을
+    # PIVOT 은 subgoal 을 풀 때도 path 제약을 함께 본다 - 그 지점이 path 제약을
     # 어기는 자리라면 애초에 목표로 삼을 이유가 없다.
     # path 제약은 Traj 를 받는다. 한 점이라도 감싸서 넘겨야 한다 - 튜플을 그대로
     # 넘기면 매번 예외가 나고 constraint_violation 이 그것을 삼켜 기여가 0 이 된다.
@@ -125,7 +125,7 @@ def subgoal_cost(pose, ctx, return_detail=False):
 def path_cost(poses, ctx, return_detail=False):
     """조밀한 자세 열의 비용.
 
-    poses: (N, 3) 시작·끝 포함. 제약은 시작·끝을 뺀 안쪽만 본다 - ReKep 과 같다.
+    poses: (N, 3) 시작·끝 포함. 제약은 시작·끝을 뺀 안쪽만 본다 - PIVOT 과 같다.
     시작은 이미 지나온 곳이고 끝은 subgoal solver 가 정한 곳이라, 여기서 벌해 봐야
     제어점이 바꿀 수 없는 값이다.
     """
@@ -138,7 +138,7 @@ def path_cost(poses, ctx, return_detail=False):
         ctx["sdf_interp"], cells, ctx.get("infeasible_r_m", 0.0))
 
     # 직선 거리로 나눠 무차원으로 만든다. **작업공간 크기 보정이지 가중치 변경이 아니다.**
-    # ReKep 은 0.55 m 작업공간이라 이 항이 0.3 수준이지만 6 m 주방에서는 그대로 두면
+    # PIVOT 은 0.55 m 작업공간이라 이 항이 0.3 수준이지만 6 m 주방에서는 그대로 두면
     # 5~6 이 되어 충돌 항(0.5 × 침범 합)을 압도한다 - 실측: HumanBlockingRouteB 에서
     # 41 점 중 30 점이 장애물 **안쪽**(최대 0.56 m 깊이)인 경로가 최적해로 나왔다.
     # 벽을 뚫고 직선으로 가는 쪽이 비용상 이득이었기 때문이다.
@@ -150,7 +150,7 @@ def path_cost(poses, ctx, return_detail=False):
     # 진행 방향 변화. [0,1] 로 정규화한다 - turn_cost 와 같은 꼴.
     d["smooth"] = W_SMOOTH * I.heading_change(poses)
 
-    # 회전 비용은 제어점마다. ReKep 도 IK 비용을 제어점마다 더한다.
+    # 회전 비용은 제어점마다. PIVOT 도 IK 비용을 제어점마다 더한다.
     d["turn"] = W_TURN * float(np.mean([
         I.turn_cost(poses[i], poses[i + 1]) for i in range(len(poses) - 1)]))
 

@@ -1,6 +1,6 @@
 """점유 격자 -> 부호거리장.
 
-ReKep 은 시뮬레이터가 주는 SDF 복셀을 그대로 받지만(`env.get_sdf_voxels`), 우리에게는
+PIVOT 은 시뮬레이터가 주는 SDF 복셀을 그대로 받지만(`env.get_sdf_voxels`), 우리에게는
 2D 점유 격자(`avoidance_map`)뿐이다. 거리 변환으로 만든다.
 
 최적화기가 이 값을 미분해 쓰므로 두 가지가 중요하다: 부호가 맞을 것, 그리고 매끄러울 것.
@@ -36,7 +36,7 @@ def build(avoidance_map, cell_m=CELL_M, threshold=0.5):
     interp = RegularGridInterpolator(
         (np.arange(h, dtype=float), np.arange(w, dtype=float)), sdf_m,
         bounds_error=False,
-        # 맵 밖은 "장애물 안" 으로 친다. ReKep 은 0 을 쓰지만 그러면 최적화기가
+        # 맵 밖은 "장애물 안" 으로 친다. PIVOT 은 0 을 쓰지만 그러면 최적화기가
         # 맵 밖이 공짜임을 발견해 subgoal 을 주방 밖에 세운다.
         fill_value=-1.0,
     )
@@ -44,9 +44,9 @@ def build(avoidance_map, cell_m=CELL_M, threshold=0.5):
 
 
 def collision_cost(interp, cells, radius_m, margin_m):
-    """이 점들이 얼마나 침범했는가. ReKep 의 calculate_collision_cost 와 같은 꼴.
+    """이 점들이 얼마나 침범했는가. PIVOT 의 calculate_collision_cost 와 같은 꼴.
 
-    ReKep 은 잡은 물체의 점군을 자세마다 변환해 검사하지만, 우리 로봇은 등방 원판이라
+    PIVOT 은 잡은 물체의 점군을 자세마다 변환해 검사하지만, 우리 로봇은 등방 원판이라
     중심 한 점이면 충분하다 - 테두리 8 점을 재도 값이 같고 보간 호출만 8 배가 된다.
     """
     d = np.asarray(interp(np.atleast_2d(cells)), dtype=float)

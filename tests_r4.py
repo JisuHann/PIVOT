@@ -91,7 +91,7 @@ except Exception:                                                 # noqa: BLE001
 else:
     from PIL import Image
     # outputs 는 worktree 에 없다 (원본 checkout 의 미커밋 산출물).
-    img_path = (os.environ.get("REKEP_FIXTURES",
+    img_path = (os.environ.get("PIVOT_FIXTURES",
         "/home/jisu/workspace/safety/robotics-safety/policy/keypoint_nav/outputs") + "/"
                 "outputs/e6_20/layout0/NavigateKitchenCatBlockingRouteA/hook_topview.png")
     im = Image.open(img_path).convert("RGB")

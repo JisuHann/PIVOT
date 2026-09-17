@@ -1,6 +1,6 @@
-"""정규화·보간·경로길이. ReKep 의 utils.py 에서 2D 로 옮긴 것들.
+"""정규화·보간·경로길이. PIVOT 의 utils.py 에서 2D 로 옮긴 것들.
 
-ReKep 은 6D 자세(위치 3 + 오일러 3)를 쓰지만 우리는 (x, y, yaw) 3D 다. 회전이 한 축뿐이라
+PIVOT 은 6D 자세(위치 3 + 오일러 3)를 쓰지만 우리는 (x, y, yaw) 3D 다. 회전이 한 축뿐이라
 쿼터니언 구면보간이 필요 없고 각도 하나를 감아 주면 된다 - 그 "감아 준다" 를 한 군데로
 모으는 것이 이 파일의 목적이다. 각도 wrap 은 여러 곳에서 조용히 틀리는 종류의 계산이다.
 """
@@ -18,7 +18,7 @@ def angle_diff(a, b):
 
 
 def normalize_vars(x, bounds):
-    """실제 값 -> [-1, 1]. ReKep 의 normalize_vars 와 같다.
+    """실제 값 -> [-1, 1]. PIVOT 의 normalize_vars 와 같다.
 
     최적화기에 원래 단위(미터와 라디안)를 그대로 주면 축마다 눈금이 달라 한 축만
     움직이는 해가 나온다.
@@ -36,9 +36,9 @@ def unnormalize_vars(z, bounds):
 
 
 def num_control_points(start_pose, end_pose, pos_step_m, rot_step_rad, lo=3, hi=6):
-    """제어점 개수. ReKep 의 get_linear_interpolation_steps 를 2D 로.
+    """제어점 개수. PIVOT 의 get_linear_interpolation_steps 를 2D 로.
 
-    ReKep 의 pos_step 0.20 m 는 0.55 m 작업공간 기준이다. 6 m 주방에 그대로 쓰면 늘
+    PIVOT 의 pos_step 0.20 m 는 0.55 m 작업공간 기준이다. 6 m 주방에 그대로 쓰면 늘
     상한 6 개로 포화해 가장 비싼 분기만 탄다 - config 에서 0.60 m 로 올려 잡는다.
     """
     d = float(np.linalg.norm(np.asarray(end_pose)[:2] - np.asarray(start_pose)[:2]))
@@ -70,7 +70,7 @@ def interpolate(poses, n):
 
 
 def path_length(poses, rot_weight=1.0):
-    """(위치 길이, 회전 길이). ReKep 의 path_length 와 같은 분해."""
+    """(위치 길이, 회전 길이). PIVOT 의 path_length 와 같은 분해."""
     p = np.asarray(poses, dtype=float).reshape(-1, 3)
     if len(p) < 2:
         return 0.0, 0.0
@@ -80,7 +80,7 @@ def path_length(poses, rot_weight=1.0):
 
 
 def consistency(pose, ref, rot_weight=1.5):
-    """기준 자세에서 얼마나 벗어났나. ReKep 의 consistency 와 같은 뜻.
+    """기준 자세에서 얼마나 벗어났나. PIVOT 의 consistency 와 같은 뜻.
 
     subgoal 이 주방 저편으로 순간이동하는 것을 막는다. 조작에서보다 네비게이션에서
     더 중요하다 - 이것이 "단계" 를 한 걸음으로 만드는 유일한 항이다.
@@ -94,11 +94,11 @@ def consistency(pose, ref, rot_weight=1.5):
 def turn_cost(cur_pose, next_pose):
     """제자리 회전이 얼마나 필요한가. [0, 1] 로 정규화.
 
-    ReKep 의 IK 비용(가중치 20)이 하던 일은 "물리적으로 못 가는 자세를 내지 마라" 다.
+    PIVOT 의 IK 비용(가중치 20)이 하던 일은 "물리적으로 못 가는 자세를 내지 마라" 다.
     홀로노믹 베이스에서는 자유공간이면 어디든 갈 수 있으므로 도달성이 아니라
     *싸게 도달 가능한가* 가 대응한다 - 돌아야 하는 각도의 합이다.
 
-    ReKep 의 num_descents/max_iterations 처럼 [0,1] 로 맞춰야 가중치 20 이 그대로 옮겨진다.
+    PIVOT 의 num_descents/max_iterations 처럼 [0,1] 로 맞춰야 가중치 20 이 그대로 옮겨진다.
     """
     c = np.asarray(cur_pose, dtype=float)
     n = np.asarray(next_pose, dtype=float)

@@ -13,10 +13,10 @@ sys.path.insert(0, _H)
 sys.path.insert(0, os.path.join(_H, "src"))
 sys.path.insert(0, os.path.join(_H, "lib"))
 
-from adapters.planner_hook import RekepPlannerHook           # noqa: E402
+from adapters.planner_hook import PivotPlannerHook           # noqa: E402
 from src.geometry import TopviewFrame                        # noqa: E402
 
-DUMP = (os.environ.get("REKEP_FIXTURES",
+DUMP = (os.environ.get("PIVOT_FIXTURES",
         "/home/jisu/workspace/safety/robotics-safety/policy/keypoint_nav/outputs") + "/"
         "e6_20/layout0/NavigateKitchenCatBlockingRouteA/voxposer_dump.npz")
 npz = np.load(DUMP, allow_pickle=True)
@@ -74,7 +74,7 @@ CFG = {"main": {"constraint_tolerance": 0.10, "max_iterations": 40, "max_backtra
                  "base_url": "http://localhost:8003/v1",
                  "temperature": 0.0, "max_tokens": 900}}
 
-hook = RekepPlannerHook(CFG, prompts_dir=os.path.join(_H, "prompts"))
+hook = PivotPlannerHook(CFG, prompts_dir=os.path.join(_H, "prompts"))
 env = FakeEnv()
 res = hook(env, start_pos=start_cell, affordance_map=aff, avoidance_map=avoid,
            robot_radius_cells=3)
@@ -105,8 +105,8 @@ shape_ok = (len(t0) == 3 and np.asarray(t0[0]).shape == (2,)
 print(f"삼중항 (xy, yaw, speed): {shape_ok}")
 ok &= shape_ok
 
-log = os.path.join(FakeEnv._task_dir, "rekep_log.json")
-print(f"rekep_log.json: {os.path.exists(log)}")
+log = os.path.join(FakeEnv._task_dir, "pivot_log.json")
+print(f"pivot_log.json: {os.path.exists(log)}")
 ok &= os.path.exists(log)
 if os.path.exists(log):
     import json

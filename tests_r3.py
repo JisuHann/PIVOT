@@ -19,10 +19,10 @@ sys.path.insert(0, os.path.join(_H, "lib"))
 
 from src import sdf as S                                          # noqa: E402
 from src.geometry import TopviewFrame                             # noqa: E402
-from src.loop import RekepLoop                                    # noqa: E402
+from src.loop import PivotLoop                                    # noqa: E402
 import constraints as K                                           # noqa: E402
 
-DUMP = (os.environ.get("REKEP_FIXTURES",
+DUMP = (os.environ.get("PIVOT_FIXTURES",
         "/home/jisu/workspace/safety/robotics-safety/policy/keypoint_nav/outputs") + "/"
         "e6_20/layout0/NavigateKitchenCatBlockingRouteA/voxposer_dump.npz")
 npz = np.load(DUMP, allow_pickle=True)
@@ -55,7 +55,7 @@ prog_ok = {
     1: {"name": "중간까지", "subgoal": [lambda st, kps: K.progress_cost(st, mid, 0.4)], "path": []},
     2: {"name": "목표까지", "subgoal": [lambda st, kps: K.progress_cost(st, goal, 0.3)], "path": []},
 }
-loop = RekepLoop(CFG, bxy)
+loop = PivotLoop(CFG, bxy)
 poses, info = loop.run(start, prog_ok, ctx)
 gap = float(np.abs(np.diff(poses[:, :2], axis=0)).max())
 print(f"(a) 정상 2 단계: waypoint {len(poses)} | 되돌리기 {len(info['backtracks'])} "
@@ -79,7 +79,7 @@ prog_bt = {
     2: {"name": "위반 단계", "subgoal": [lambda st, kps: K.progress_cost(st, goal, 0.3)],
         "path": far},
 }
-loop_b = RekepLoop(CFG, bxy)
+loop_b = PivotLoop(CFG, bxy)
 poses_b, info_b = loop_b.run(start, prog_bt, ctx)
 print(f"(b) 되돌리기: {len(info_b['backtracks'])} 회 | stop={info_b['stop']} "
       f"| waypoint {len(poses_b)} | iters {info_b['iters']}")
@@ -95,7 +95,7 @@ prog_bad = {
     1: {"name": "s1", "subgoal": [lambda st, kps: K.progress_cost(st, mid, 0.4)], "path": []},
     2: {"name": "s2", "subgoal": [lambda st, kps: K.progress_cost(st, goal, 0.3)], "path": never},
 }
-loop_c = RekepLoop(CFG, bxy)
+loop_c = PivotLoop(CFG, bxy)
 poses_c, info_c = loop_c.run(start, prog_bad, ctx)
 print(f"(c) 불가능 제약: stop={info_c['stop']} | 되돌리기 {len(info_c['backtracks'])} "
       f"| iters {info_c['iters']} (상한 {CFG['main']['max_iterations']})")

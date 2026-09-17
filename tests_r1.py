@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src
 import sdf, interp
 from geometry import TopviewFrame
 
-DUMP = (os.environ.get("REKEP_FIXTURES",
+DUMP = (os.environ.get("PIVOT_FIXTURES",
         "/home/jisu/workspace/safety/robotics-safety/policy/keypoint_nav/outputs") + "/"
         "e6_20/layout0/NavigateKitchenCatBlockingRouteA/voxposer_dump.npz")
 npz = np.load(DUMP, allow_pickle=True)

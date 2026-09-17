@@ -1,10 +1,10 @@
-# ReKep 방식 2D 네비게이션 설정.
+# PIVOT 방식 2D 네비게이션 설정.
 #
-# 가중치는 src/costs.py 에 ReKep 원본 값으로 박아 두었다. 여기 있는 것은 최적화기
-# 예산과, ReKep 값을 그대로 쓰면 안 되는 두 개다.
+# 가중치는 src/costs.py 에 PIVOT 원본 값으로 박아 두었다. 여기 있는 것은 최적화기
+# 예산과, PIVOT 값을 그대로 쓰면 안 되는 두 개다.
 
 main:
-  constraint_tolerance: 0.10     # backtracking 판정. ReKep 값 그대로
+  constraint_tolerance: 0.10     # backtracking 판정. PIVOT 값 그대로
   max_iterations: 40             # 바깥 루프 상한
   max_backtracks: 8              # 없으면 풀 수 없는 제약이 sweep 전체를 멈춘다
   # VLM · pivot · 두 solver 가 나눠 쓰는 하나의 시드. temperature 0 만으로는
@@ -25,14 +25,14 @@ main:
   pivot_samples: 9
 
 subgoal_solver:
-  sampling_maxfun: 1500          # ReKep 5000. 2D 라 표본이 덜 필요하다
+  sampling_maxfun: 1500          # PIVOT 5000. 2D 라 표본이 덜 필요하다
   minimizer_options:
     maxiter: 100
   seed: 0
 
 path_solver:
   sampling_maxfun: 1500
-  # ReKep 0.20 은 0.55m 작업공간 기준이다. 6m 주방에 그대로 쓰면 제어점이 늘
+  # PIVOT 0.20 은 0.55m 작업공간 기준이다. 6m 주방에 그대로 쓰면 제어점이 늘
   # 상한 6개로 포화해 가장 비싼 분기만 탄다.
   opt_pos_step_size: 0.60
   opt_rot_step_size: 0.78

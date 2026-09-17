@@ -23,7 +23,7 @@ from src.path_solver import PathSolver                            # noqa: E402
 from src.subgoal_solver import SubgoalSolver                      # noqa: E402
 import constraints as K                                           # noqa: E402
 
-DUMP = (os.environ.get("REKEP_FIXTURES",
+DUMP = (os.environ.get("PIVOT_FIXTURES",
         "/home/jisu/workspace/safety/robotics-safety/policy/keypoint_nav/outputs") + "/"
         "e6_20/layout0/NavigateKitchenCatBlockingRouteA/voxposer_dump.npz")
 npz = np.load(DUMP, allow_pickle=True)

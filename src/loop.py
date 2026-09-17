@@ -1,8 +1,8 @@
-"""가상 상태 반복 루프. ReKep 의 main.py `_execute` 를 옮긴 것.
+"""가상 상태 반복 루프. PIVOT 의 main.py `_execute` 를 옮긴 것.
 
 원본과 다른 점이 하나 있고, 그것이 이 파일의 존재 이유다.
 
-ReKep 은 "풀고 -> 5 스텝 실행 -> 상태 재관측 -> 다시 풀기" 를 시뮬레이터를 돌려 가며 한다.
+PIVOT 은 "풀고 -> 5 스텝 실행 -> 상태 재관측 -> 다시 풀기" 를 시뮬레이터를 돌려 가며 한다.
 우리는 그럴 수 없다: `robocasa_config.yaml` 이 navigation 에 `max_plan_iter: 1` 을 주므로
 `external_planner` 훅은 **에피소드당 한 번** 호출되고, 전체 waypoint 열을 돌려준 뒤로
 로봇을 다시 보지 못한다.
@@ -14,7 +14,7 @@ ReKep 은 "풀고 -> 5 스텝 실행 -> 상태 재관측 -> 다시 풀기" 를 �
 바꾸는 것이고, "계획 단계만 갈아끼운다" 는 비교의 전제를 깬다.
 
 부수 효과 하나는 원본보다 낫다: 계획 시점에 로봇이 전혀 움직이지 않았으므로 backtracking 이
-깨끗하다. ReKep 은 되돌리려면 물리적으로 되돌아가야 하지만, 우리는 내놓은 waypoint 를
+깨끗하다. PIVOT 은 되돌리려면 물리적으로 되돌아가야 하지만, 우리는 내놓은 waypoint 를
 잘라내면 그만이라 **로봇이 버려진 구간을 지나지 않는다.**
 """
 import numpy as np
@@ -24,7 +24,7 @@ from .path_solver import PathSolver
 from .subgoal_solver import SubgoalSolver
 
 
-class RekepLoop:
+class PivotLoop:
     def __init__(self, cfg, bounds_xy):
         main = dict(cfg.get("main", {}))
         self.tol = float(main.get("constraint_tolerance", 0.10))
@@ -40,7 +40,7 @@ class RekepLoop:
     def _path_violation(self, stage_fns, pose, keypoints, make_traj=None):
         """이 자세에서 path 제약을 얼마나 어기는가. 최악값.
 
-        한 점만 본다 - ReKep 도 backtracking 판정에서는 현재 상태 한 점만 본다
+        한 점만 본다 - PIVOT 도 backtracking 판정에서는 현재 상태 한 점만 본다
         (`main.py:123`: `constraints(self.keypoints[0], self.keypoints[1:])`).
 
         **한 점이라도 Traj 로 감싸야 한다.** path 제약은 `clearance_cost(traj, ...)`
@@ -62,7 +62,7 @@ class RekepLoop:
         return worst if np.isfinite(worst) else -np.inf
 
     def _backtrack_target(self, stage, program, pose, keypoints, make_traj=None):
-        """되돌아갈 단계. 제약이 모두 만족되는 가장 뒤쪽 단계. ReKep main.py:129-143."""
+        """되돌아갈 단계. 제약이 모두 만족되는 가장 뒤쪽 단계. PIVOT main.py:129-143."""
         for s in range(stage - 1, 0, -1):
             fns = program[s].get("path", [])
             if not fns:
@@ -100,7 +100,7 @@ class RekepLoop:
             info["iters"] += 1
             pose = emitted[-1]
 
-            # --- 되돌릴지 판단 (ReKep main.py:118-145) ---
+            # --- 되돌릴지 판단 (PIVOT main.py:118-145) ---
             if stage > 1:
                 v = self._path_violation(program[stage].get("path", []), pose,
                                          ctx["keypoints"], ctx.get("make_traj"))

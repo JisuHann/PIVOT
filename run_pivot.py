@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""ReKep 방식 정책 실행 진입점.
+"""PIVOT 방식 정책 실행 진입점.
 
 환경 생성·에피소드 루프·컨트롤러·평가·판정문 기록은 Voxposer 의 ``run_tasks`` 를
-**그대로 공유**한다 (`external_planner` 훅). 여기서 하는 일은 계획 단계를 ReKep 방식
+**그대로 공유**한다 (`external_planner` 훅). 여기서 하는 일은 계획 단계를 PIVOT 방식
 solver 로 갈아끼우는 것뿐이다 - `keypoint_nav` 와 같은 구조다.
 
 평가 코드를 복제하지 않는 이유는 하나다: 세 정책이 같은 잣대로 채점되어야 비교가
 성립한다. 복제하면 판정문 형식이나 임계가 조용히 어긋난다.
 
-    python3 run_rekep.py -m Qwen/Qwen3-VL-8B-Instruct -p 8003 \\
+    python3 run_pivot.py -m Qwen/Qwen3-VL-8B-Instruct -p 8003 \\
         --layout-ids 0 --style-ids 3 -o outputs/smoke NavigateKitchenCatBlockingRouteA
 """
 import argparse
@@ -22,7 +22,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "src"))
 sys.path.insert(0, _HERE)
 
-from adapters.planner_hook import RekepPlannerHook          # noqa: E402
+from adapters.planner_hook import PivotPlannerHook          # noqa: E402
 from adapters.voxposer_controller import _ensure_path       # noqa: E402
 
 
@@ -31,7 +31,7 @@ def main():
     ap.add_argument("tasks", nargs="*", help="과제 이름. 비우면 전체")
     ap.add_argument("-m", "--model", default=None)
     ap.add_argument("-p", "--port", type=int, default=None)
-    ap.add_argument("-o", "--output-dir", default="outputs/rekep")
+    ap.add_argument("-o", "--output-dir", default="outputs/pivot")
     ap.add_argument("-c", "--config", default=os.path.join(_HERE, "config.yaml"))
     ap.add_argument("--layout-ids", default="0")
     ap.add_argument("--style-ids", default="3")
@@ -77,7 +77,7 @@ def main():
 
     out_abs = os.path.abspath(args.output_dir)
     os.makedirs(out_abs, exist_ok=True)
-    hook = RekepPlannerHook(cfg, prompts_dir=os.path.join(_HERE, "prompts"),
+    hook = PivotPlannerHook(cfg, prompts_dir=os.path.join(_HERE, "prompts"),
                             out_root=out_abs)
 
     _ensure_path()
@@ -86,7 +86,7 @@ def main():
     def _ids(s):
         return [int(x) for x in str(s).split(",") if str(x).strip()]
 
-    with open(os.path.join(out_abs, "rekep_config.json"), "w") as f:
+    with open(os.path.join(out_abs, "pivot_config.json"), "w") as f:
         json.dump({"config": cfg, "model": model, "base_url": base_url}, f,
                   ensure_ascii=False, indent=2)
 

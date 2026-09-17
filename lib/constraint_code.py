@@ -18,7 +18,7 @@ import constraints as K
 _FENCE = re.compile(r"```(?:python)?\s*(.*?)```", re.S)
 _DEF = re.compile(r"^\s*def\s+\w+\s*\(", re.M)
 
-# 함수 이름 규약. leg{N}_constraint{M} 또는 ReKep 식 stage{N}_*_constraint{M}.
+# 함수 이름 규약. leg{N}_constraint{M} 또는 PIVOT 식 stage{N}_*_constraint{M}.
 _NAME = re.compile(r"^(?:leg|stage)\d+_(?:subgoal_|path_|pace_)?constraint\d+$")
 
 
@@ -107,7 +107,7 @@ def _check_kp(call, allowed_kps):
     세 가지 형태를 다 본다:
         kp="A"                 키워드 + 상수
         f(traj, "A", ...)      위치 + 상수
-        keypoints['human']     ReKep 관용구 - VLM 이 실제로 가장 많이 쓴다
+        keypoints['human']     PIVOT 관용구 - VLM 이 실제로 가장 많이 쓴다
 
     마지막을 빼먹었더니 없는 이름(`keypoints['star']`)이 검증을 통과해 최적화기
     안에서 KeyError 로 죽었다. 그 자리는 try/except 로 감싸여 있어 제약이 조용히
@@ -216,7 +216,7 @@ def margins_used(code):
                  "progress_cost": ["state", "kp", "tol"],
                  "heading_cost": ["state", "kp", "tol_rad"],
                  "standoff_cost": ["state", "kp", "min_d"],
-                 # ReKep 단계용. 구간이 단계이므로 speed 에 kp·radius 가 없다.
+                 # PIVOT 단계용. 구간이 단계이므로 speed 에 kp·radius 가 없다.
                  "speed_cost": ["traj", "v_max"],
                  "accel_cost": ["traj", "a_max"],
                  "jerk_cost": ["traj", "j_max"]}.get(node.func.id, ["traj"])
@@ -227,7 +227,7 @@ def margins_used(code):
             if isinstance(kw.value, ast.Constant):
                 rec[kw.arg] = kw.value.value
         if "kp" not in rec:
-            # VLM 은 keypoints['A'] 형태를 더 자연스럽게 쓴다 (ReKep 관용구).
+            # VLM 은 keypoints['A'] 형태를 더 자연스럽게 쓴다 (PIVOT 관용구).
             for a in node.args:
                 if (isinstance(a, ast.Subscript) and isinstance(a.slice, ast.Constant)):
                     rec["kp"] = a.slice.value
